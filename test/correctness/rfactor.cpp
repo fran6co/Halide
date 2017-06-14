@@ -933,8 +933,85 @@ int rfactor_tile_reorder_test() {
     return 0;
 }
 
+int tuple_partial_reduction_rfactor_test(bool compile_module) {
+    Func f("f"), g("g");
+    Var x("x"), y("y");
+
+    f(x, y) = Tuple(x + y, x - y);
+    f.compute_root();
+
+    RDom r(10, 20, 30, 40);
+
+    Func ref("ref");
+    ref(x, y) = Tuple(1, 3);
+    ref(x, y) = Tuple(ref(x , y)[0] + f(r.x, r.y)[0] + 3, ref(x , y)[1]);
+    Realization ref_rn = ref.realize(80, 80);
+
+    g(x, y) = Tuple(1, 3);
+    g(x , y) = Tuple(g(x , y)[0] + f(r.x, r.y)[0] + 3, g(x , y)[1]);
+    g.reorder({y, x});
+
+    Var xi("xi"), yi("yi");
+    g.update(0).tile(x, y, xi, yi, 4, 4);
+
+    Var u("u");
+    Func intm1 = g.update(0).rfactor(r.y, u);
+    RVar rxi("rxi"), rxo("rxo");
+    intm1.tile(x, y, xi, yi, 4, 4);
+    intm1.update(0).split(r.x, rxo, rxi, 2);
+
+    Var v("v");
+    Func intm2 = intm1.update(0).rfactor(rxo, v);
+    intm2.compute_at(intm1, rxo);
+
+    intm1.update(0).parallel(u, 2);
+    intm1.compute_root();
+
+    if (compile_module) {
+        // Check the call graphs.
+        Module m = g.compile_to_module({g.infer_arguments()});
+        CheckCalls checker;
+        m.functions().front().body.accept(&checker);
+
+        CallGraphs expected = {
+            {g.name(), {intm1.name() + ".0", intm1.name() + ".1",
+                        g.name() + ".0", g.name() + ".1"}},
+            {intm1.name(), {intm2.name() + ".0", intm2.name() + ".1",
+                            intm1.name() + ".0", intm1.name() + ".1"}},
+            {intm2.name(), {f.name() + ".0", f.name() + ".1",
+                            intm2.name() + ".0", intm2.name() + ".1"}},
+            {f.name(), {}},
+        };
+        if (check_call_graphs(checker.calls, expected) != 0) {
+            return -1;
+        }
+    } else {
+        Realization rn = g.realize(80, 80);
+        Buffer<int> im1(rn[0]);
+        Buffer<int> im2(rn[1]);
+
+        Buffer<int> ref_im1(ref_rn[0]);
+        Buffer<int> ref_im2(ref_rn[1]);
+
+        auto func1 = [&ref_im1](int x, int y, int z) {
+            return ref_im1(x, y);
+        };
+        if (check_image(im1, func1)) {
+            return -1;
+        }
+
+        auto func2 = [&ref_im2](int x, int y, int z) {
+            return ref_im2(x, y);
+        };
+        if (check_image(im2, func2)) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char **argv) {
-    printf("Running simple rfactor test\n");
+    /*printf("Running simple rfactor test\n");
     printf("    checking call graphs...\n");
     if (simple_rfactor_test(true) != 0) {
         return -1;
@@ -1054,6 +1131,16 @@ int main(int argc, char **argv) {
         return -1;
     }
 
+    printf("Running tuple partial reduction rfactor test\n");
+    printf("    checking call graphs...\n");
+    if (tuple_partial_reduction_rfactor_test(true) != 0) {
+        return -1;
+    }
+    printf("    checking output img correctness...\n");
+    if (tuple_partial_reduction_rfactor_test(false) != 0) {
+        return -1;
+    }
+
     printf("Running check allocation bound test\n");
     if (check_allocation_bound_test() != 0) {
         return -1;
@@ -1072,6 +1159,16 @@ int main(int argc, char **argv) {
 
     printf("Running argmin rfactor test\n");
     if (argmin_rfactor_test() != 0) {
+        return -1;
+    }*/
+
+    printf("Running tuple partial reduction rfactor test\n");
+    printf("    checking call graphs...\n");
+    if (tuple_partial_reduction_rfactor_test(true) != 0) {
+        return -1;
+    }
+    printf("    checking output img correctness...\n");
+    if (tuple_partial_reduction_rfactor_test(false) != 0) {
         return -1;
     }
 
