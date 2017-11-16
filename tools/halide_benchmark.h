@@ -142,7 +142,7 @@ inline BenchmarkResult benchmark(std::function<void()> op, const BenchmarkConfig
         result.iterations = 0;
         total_time = 0;
         for (int i = 0; i < kMinSamples; i++) {
-            times[i] = benchmark(1, iters_per_sample, op);
+            times[i] = benchmark(1, static_cast<int>(iters_per_sample), op);
             result.samples++;
             result.iterations += iters_per_sample;
             total_time += times[i] * iters_per_sample;
@@ -165,7 +165,7 @@ inline BenchmarkResult benchmark(std::function<void()> op, const BenchmarkConfig
     while ((times[0] * accuracy < times[kMinSamples - 1] || total_time < min_time) &&
                  total_time < max_time &&
                  result.iterations < max_iters) {
-        times[kMinSamples] = benchmark(1, iters_per_sample, op);
+        times[kMinSamples] = benchmark(1, static_cast<int>(iters_per_sample), op);
         result.samples++;
         result.iterations += iters_per_sample;
         total_time += times[kMinSamples] * iters_per_sample;

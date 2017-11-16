@@ -1211,7 +1211,7 @@ bool save_mat(ImageType &im, const std::string &filename) {
     while (name.size() & 0x7) name += '\0';
 
     char header[128] = "MATLAB 5.0 MAT-file, produced by Halide";
-    int len = strlen(header);
+    size_t len = strlen(header);
     memset(header + len, ' ', sizeof(header) - len);
 
     // Version
